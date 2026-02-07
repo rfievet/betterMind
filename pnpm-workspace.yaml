@@ -1,0 +1,5 @@
+# pnpm workspace configuration
+# This tells pnpm to treat this as a monorepo with multiple packages
+packages:
+  - 'apps/*'
+  - 'packages/*'

@@ -1,0 +1,26 @@
+{
+  "name": "bettermind",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-assisted mental wellness platform - monorepo",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @bettermind/api dev\" \"pnpm --filter @bettermind/web dev\"",
+    "dev:mobile": "pnpm --filter @bettermind/mobile dev",
+    "build": "pnpm --filter @bettermind/shared build && pnpm --filter @bettermind/api build && pnpm --filter @bettermind/web build",
+    "test": "pnpm --recursive test",
+    "lint": "pnpm --recursive lint",
+    "clean": "pnpm --recursive clean"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

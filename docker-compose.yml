@@ -1,0 +1,44 @@
+# Docker Compose configuration for local development
+# This sets up PostgreSQL database for the betterMind API
+version: '3.8'
+
+services:
+  # PostgreSQL database service
+  postgres:
+    image: postgres:15-alpine
+    container_name: bettermind-postgres
+    restart: unless-stopped
+    environment:
+      # Database credentials (change these in production!)
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bettermind
+    ports:
+      # Expose PostgreSQL on default port
+      - '5432:5432'
+    volumes:
+      # Persist database data between container restarts
+      - postgres_data:/var/lib/postgresql/data
+      # Initialize database with schema on first run
+      - ./apps/api/src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      # Check if database is ready to accept connections
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for session storage (optional, for future scaling)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: bettermind-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - '6379:6379'
+  #   volumes:
+  #     - redis_data:/data
+
+volumes:
+  # Named volume for PostgreSQL data persistence
+  postgres_data:
+  # redis_data:
