@@ -72,18 +72,69 @@ cp apps/mobile/.env.example apps/mobile/.env
 docker-compose up -d
 
 # 4. Build shared package
-cd packages/shared && pnpm run build && cd ../..
+pnpm run build:shared
 
 # 5. Start development servers
 pnpm run dev
 ```
 
+## 🎮 Running the Applications
+
+### Option 1: Run Everything Together (Recommended)
+
+```bash
+# Run API + Web (hot-reload enabled)
+pnpm run dev
+
+# OR run API + Web + Mobile
+pnpm run dev:all
+```
+
+This will start:
+- 🔵 **API** on http://localhost:3001 (auto-reloads on file changes)
+- 🟣 **Web** on http://localhost:3002 (auto-reloads on file changes)
+- 🟢 **Mobile** on http://localhost:19006 (if using dev:all)
+
+### Option 2: Run Individually
+
+**Backend API:**
+```bash
+pnpm run dev:api
+# Runs on http://localhost:3001
+# Auto-reloads when you modify files in apps/api/
+```
+
+**Web App:**
+```bash
+pnpm run dev:web
+# Runs on http://localhost:3002
+# Auto-reloads when you modify files in apps/web/
+```
+
+**Mobile App (React Native):**
+```bash
+pnpm run dev:mobile
+# Opens Expo DevTools at http://localhost:19006
+# Press 'w' to open in web browser (phone dimensions)
+# OR scan QR code with Expo Go app on your phone
+```
+
+### Hot Reload / Watch Mode
+
+All development commands include **automatic hot-reload**:
+- ✅ **API**: Uses `tsx watch` - restarts on file changes
+- ✅ **Web**: Uses Next.js Fast Refresh - instant updates
+- ✅ **Mobile**: Uses Expo Fast Refresh - instant updates
+
+Just save your files and see changes immediately!
+
 ### Access the Applications
 
-- 🌐 **Web App**: http://localhost:3000
+- 🌐 **Web App**: http://localhost:3002
 - 🔌 **API**: http://localhost:3001
-- 📱 **Mobile**: Scan QR code from Expo
+- 📱 **Mobile (Web)**: http://localhost:19006 (press 'w' in terminal)
 - 📚 **API Docs**: http://localhost:3001/api/v1/docs
+- 💚 **Health Check**: http://localhost:3001/health
 
 ## 🔑 Required API Keys
 

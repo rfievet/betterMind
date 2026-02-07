@@ -42,7 +42,8 @@ export function errorHandler(
 
   // Handle AppError (our custom errors)
   if (error instanceof AppError) {
-    res.status(error.statusCode).json({
+    const statusCode = error.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+    res.status(statusCode).json({
       success: false,
       error: {
         message: error.message,

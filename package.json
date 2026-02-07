@@ -4,9 +4,13 @@
   "private": true,
   "description": "AI-assisted mental wellness platform - monorepo",
   "scripts": {
-    "dev": "concurrently \"pnpm --filter @bettermind/api dev\" \"pnpm --filter @bettermind/web dev\"",
+    "dev": "concurrently -n \"API,WEB\" -c \"blue,magenta\" \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:all": "concurrently -n \"API,WEB,MOBILE\" -c \"blue,magenta,green\" \"pnpm dev:api\" \"pnpm dev:web\" \"pnpm dev:mobile\"",
+    "dev:api": "pnpm --filter @bettermind/api dev",
+    "dev:web": "pnpm --filter @bettermind/web dev",
     "dev:mobile": "pnpm --filter @bettermind/mobile dev",
     "build": "pnpm --filter @bettermind/shared build && pnpm --filter @bettermind/api build && pnpm --filter @bettermind/web build",
+    "build:shared": "pnpm --filter @bettermind/shared build",
     "test": "pnpm --recursive test",
     "lint": "pnpm --recursive lint",
     "clean": "pnpm --recursive clean"

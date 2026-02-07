@@ -65,7 +65,7 @@ export const config = {
   // Gemini AI configuration
   gemini: {
     apiKey: process.env.GEMINI_API_KEY!,
-    model: 'gemini-pro', // Model to use for text generation
+    model: 'gemini-2.5-flash', // Gemini 2.5 Flash model
   },
 
   // ElevenLabs configuration

@@ -5,6 +5,7 @@
 
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import './globals.css';
 
 // Load Inter font from Google Fonts
@@ -20,11 +21,15 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Get Google Client ID from environment variable
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+
   return (
     <html lang="en">
       <body className={inter.className}>
-        {/* Main content */}
-        {children}
+        <GoogleOAuthProvider clientId={googleClientId}>
+          {children}
+        </GoogleOAuthProvider>
       </body>
     </html>
   );
