@@ -9,6 +9,7 @@ import { validate } from '../middleware/validation.middleware';
 import { authenticate, AuthRequest } from '../middleware/auth.middleware';
 import { asyncHandler } from '../middleware/error.middleware';
 import * as conversationService from '../services/conversation.service';
+import * as elevenlabsAgentService from '../services/elevenlabs-agent.service';
 
 const router = Router();
 
@@ -162,6 +163,74 @@ router.delete(
       req.user!.userId
     );
     res.status(204).send();
+  })
+);
+
+/**
+ * POST /api/v1/conversations/:id/voice-call
+ * Get a signed URL for ElevenLabs voice call
+ * This keeps the API key secure on the server
+ */
+router.post(
+  '/:id/voice-call',
+  [
+    param('id').isUUID().withMessage('Invalid conversation ID'),
+    validate,
+  ],
+  asyncHandler(async (req: AuthRequest, res) => {
+    // Verify user owns this conversation
+    await conversationService.getConversationById(
+      req.params.id,
+      req.user!.userId
+    );
+
+    // Get or create ElevenLabs agent
+    const agentId = await elevenlabsAgentService.getOrCreateAgent();
+    
+    // Get signed URL for secure WebSocket connection
+    const signedUrl = await elevenlabsAgentService.getSignedUrl(agentId);
+
+    res.json({
+      success: true,
+      data: {
+        signedUrl,
+        conversationId: req.params.id,
+      },
+    });
+  })
+);
+
+/**
+ * POST /api/v1/conversations/:id/voice-transcript
+ * Save voice call transcript to conversation
+ */
+router.post(
+  '/:id/voice-transcript',
+  [
+    param('id').isUUID().withMessage('Invalid conversation ID'),
+    body('transcript')
+      .isArray()
+      .withMessage('Transcript must be an array'),
+    body('transcript.*.role')
+      .isIn(['user', 'assistant'])
+      .withMessage('Invalid role'),
+    body('transcript.*.content')
+      .trim()
+      .notEmpty()
+      .withMessage('Content is required'),
+    validate,
+  ],
+  asyncHandler(async (req: AuthRequest, res) => {
+    const result = await conversationService.saveVoiceTranscript(
+      req.params.id,
+      req.user!.userId,
+      req.body.transcript
+    );
+    res.json({
+      success: true,
+      data: result,
+      message: 'Transcript saved successfully',
+    });
   })
 );
 

@@ -9,6 +9,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { conversationApi, getErrorMessage } from '@/lib/api';
 import type { ConversationWithMessages, MessageResponse } from '@bettermind/shared';
+import VoiceCall from './VoiceCall';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -20,8 +21,14 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [generatingVoice, setGeneratingVoice] = useState<string | null>(null);
+  const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+  const [isVoiceCallActive, setIsVoiceCallActive] = useState(false);
+  const [voiceCallSignedUrl, setVoiceCallSignedUrl] = useState<string | null>(null);
+  const [startingCall, setStartingCall] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     // Check if user is logged in
@@ -78,6 +85,124 @@ export default function ChatPage() {
     }
   };
 
+  const handleGenerateVoice = async (messageId: string) => {
+    setGeneratingVoice(messageId);
+    try {
+      const result = await conversationApi.generateVoice(conversationId, messageId);
+      
+      // Update message with audio URL
+      setConversation((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          messages: prev.messages.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, audioUrl: result.audioUrl }
+              : msg
+          ),
+        };
+      });
+
+      // Auto-play the generated audio
+      playAudio(result.audioUrl, messageId);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setGeneratingVoice(null);
+    }
+  };
+
+  const playAudio = (audioUrl: string, messageId: string) => {
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    // Create and play new audio
+    const audio = new Audio(`http://localhost:3001${audioUrl}`);
+    audioRef.current = audio;
+    setPlayingAudio(messageId);
+
+    audio.onended = () => {
+      setPlayingAudio(null);
+      audioRef.current = null;
+    };
+
+    audio.onerror = () => {
+      setError('Failed to play audio');
+      setPlayingAudio(null);
+      audioRef.current = null;
+    };
+
+    audio.play().catch((err) => {
+      console.error('Audio play error:', err);
+      setError('Failed to play audio');
+      setPlayingAudio(null);
+    });
+  };
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setPlayingAudio(null);
+    }
+  };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleStartVoiceCall = async () => {
+    setStartingCall(true);
+    setError('');
+    try {
+      const { signedUrl } = await conversationApi.startVoiceCall(conversationId);
+      setVoiceCallSignedUrl(signedUrl);
+      setIsVoiceCallActive(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setStartingCall(false);
+    }
+  };
+
+  const handleVoiceCallEnd = async (transcript: Array<{ role: 'user' | 'assistant'; content: string }>) => {
+    setIsVoiceCallActive(false);
+    setVoiceCallSignedUrl(null);
+
+    // Save transcript to conversation
+    if (transcript.length > 0) {
+      try {
+        await conversationApi.saveVoiceTranscript(conversationId, transcript);
+        // Reload conversation to show transcript
+        await loadConversation();
+      } catch (err) {
+        console.error('Failed to save transcript:', err);
+      }
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!confirm('Are you sure you want to delete this conversation? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await conversationApi.delete(conversationId);
+      router.push('/dashboard');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -107,6 +232,15 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      {/* Voice Call Overlay */}
+      {isVoiceCallActive && voiceCallSignedUrl && (
+        <VoiceCall
+          signedUrl={voiceCallSignedUrl}
+          onTranscript={handleVoiceCallEnd}
+          onEnd={() => handleVoiceCallEnd([])}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -120,6 +254,43 @@ export default function ChatPage() {
             <h1 className="text-lg font-semibold text-gray-900">
               {conversation.title || 'Conversation'}
             </h1>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* Delete Button */}
+            <button
+              onClick={handleDeleteConversation}
+              className="flex items-center gap-2 text-red-600 px-3 py-2 rounded-lg font-medium hover:bg-red-50 transition-colors"
+              title="Delete conversation"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </button>
+            
+            {/* Voice Call Button */}
+            <button
+              onClick={handleStartVoiceCall}
+              disabled={startingCall}
+              className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {startingCall ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                  </svg>
+                  Voice Call
+                </>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -151,6 +322,37 @@ export default function ChatPage() {
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
+                  
+                  {/* Voice controls for assistant messages */}
+                  {msg.role === 'assistant' && msg.audioUrl && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          playingAudio === msg.id
+                            ? stopAudio()
+                            : playAudio(msg.audioUrl!, msg.id)
+                        }
+                        className="flex items-center gap-2 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100 transition-colors"
+                      >
+                        {playingAudio === msg.id ? (
+                          <>
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Stop
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                            </svg>
+                            Play
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                  
                   <p
                     className={`text-xs mt-2 ${
                       msg.role === 'user' ? 'text-primary-100' : 'text-gray-400'

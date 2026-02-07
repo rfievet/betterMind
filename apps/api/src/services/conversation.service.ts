@@ -351,3 +351,58 @@ export async function deleteConversation(
     });
   });
 }
+
+/**
+ * Save voice call transcript to conversation
+ * Converts voice conversation into text messages
+ */
+export async function saveVoiceTranscript(
+  conversationId: string,
+  userId: string,
+  transcript: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<{ messageCount: number }> {
+  return transaction(async (client) => {
+    // Verify conversation belongs to user
+    const conversation = await client.query(
+      'SELECT id, title FROM conversations WHERE id = $1 AND user_id = $2',
+      [conversationId, userId]
+    );
+
+    if (conversation.rows.length === 0) {
+      throw new AppError(
+        HttpStatus.NOT_FOUND,
+        'Conversation not found',
+        ErrorCode.CONVERSATION_NOT_FOUND
+      );
+    }
+
+    // Save each message from transcript
+    for (const entry of transcript) {
+      await client.query(
+        `INSERT INTO messages (conversation_id, role, type, content)
+         VALUES ($1, $2, $3, $4)`,
+        [conversationId, entry.role, 'text', entry.content]
+      );
+    }
+
+    // Update conversation timestamp
+    await client.query(
+      'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [conversationId]
+    );
+
+    // Generate title if conversation doesn't have one
+    if (!conversation.rows[0].title && transcript.length > 0) {
+      const firstUserMessage = transcript.find((t) => t.role === 'user');
+      if (firstUserMessage) {
+        const title = await aiService.generateConversationTitle(firstUserMessage.content);
+        await client.query(
+          'UPDATE conversations SET title = $1 WHERE id = $2',
+          [title, conversationId]
+        );
+      }
+    }
+
+    return { messageCount: transcript.length };
+  });
+}

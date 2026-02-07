@@ -186,6 +186,30 @@ export const conversationApi = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/conversations/${id}`);
   },
+
+  /**
+   * Start a voice call - get signed URL for ElevenLabs WebSocket
+   */
+  startVoiceCall: async (conversationId: string): Promise<{ signedUrl: string }> => {
+    const response = await apiClient.post<ApiResponse<{ signedUrl: string; conversationId: string }>>(
+      `/conversations/${conversationId}/voice-call`
+    );
+    return { signedUrl: response.data.data.signedUrl };
+  },
+
+  /**
+   * Save voice call transcript
+   */
+  saveVoiceTranscript: async (
+    conversationId: string,
+    transcript: Array<{ role: 'user' | 'assistant'; content: string }>
+  ): Promise<{ messageCount: number }> => {
+    const response = await apiClient.post<ApiResponse<{ messageCount: number }>>(
+      `/conversations/${conversationId}/voice-transcript`,
+      { transcript }
+    );
+    return response.data.data;
+  },
 };
 
 /**
